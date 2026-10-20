@@ -9,11 +9,14 @@
 		"test": "vitest",
 		"cf-typegen": "wrangler types",
 		"lint": "oxlint",
-		"lint:fix": "oxlint --fix"
+		"lint:fix": "oxlint --fix",
+		"fmt": "oxfmt",
+		"fmt:check": "oxfmt --check"
 	},
 	"devDependencies": {
 		"@cloudflare/vitest-plugin": "^1.0.0",
 		"@types/node": "^26.6.5",
+		"oxfmt": "^0.74.0",
 		"oxlint": "^1.89.0",
 		"typescript": "^5.5.2",
 		"vitest": "~4.1.0",
