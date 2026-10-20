@@ -5,13 +5,13 @@ API for generating free placeholder images for your apps.
 
 ## Overview
 
-Phloa is a TypeScript + [Node.js](https://nodejs.org/en/) API that is desgned to be hosted using [Cloudflare Worker](https://www.cloudflare.com/products/workers/).
+Phloa is a TypeScript + [Node.js](https://nodejs.org/en/) API that is desgned to be hosted using [Cloudflare Worker](https://www.cloudflare.com/products/workers/). Images are generated on demand for the requested aspect ratio.
 
 ## Commands
 
 - `npm run dev` - Run worker for local development
 - `npm run lint` - Run oxlint
-- `npm run fmt` - Run prettier
+- `npm run fmt` - Run oxfmt
 - `npm run test` - Run tests using vitest
 
 ## Structure
