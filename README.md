@@ -7,6 +7,13 @@ API for generating free placeholder images for your apps.
 
 Phloa is a TypeScript + [Node.js](https://nodejs.org/en/) API that is desgned to be hosted using [Cloudflare Worker](https://www.cloudflare.com/products/workers/). Images are generated on demand for the requested aspect ratio.
 
+## Endpoint
+
+`GET /` returns a PNG placeholder image. It accepts these optional query parameters:
+
+- `ratio`: Two positive integers separated by `:`, from `1:4` to `4:1`. Defaults to `16:9`.
+- `color`: The color for the polka dots and center square. Allowed values are `red`, `green`, `blue`, `orange`, and `cyan`; it defaults to black.
+
 ## Commands
 
 - `npm run dev` - Run worker for local development

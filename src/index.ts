@@ -6,6 +6,26 @@ type Ratio = {
 	height: number;
 };
 
+type Color = {
+	red: number;
+	green: number;
+	blue: number;
+};
+
+type ImageOptions = {
+	ratio: Ratio;
+	color: Color;
+};
+
+const COLORS = {
+	black: { red: 0, green: 0, blue: 0 },
+	red: { red: 255, green: 0, blue: 0 },
+	green: { red: 0, green: 128, blue: 0 },
+	blue: { red: 0, green: 0, blue: 255 },
+	orange: { red: 255, green: 165, blue: 0 },
+	cyan: { red: 0, green: 255, blue: 255 },
+} as const satisfies Record<string, Color>;
+
 const GLYPHS: Record<string, readonly string[]> = {
 	"0": ["01110", "10001", "10011", "10101", "11001", "10001", "01110"],
 	"1": ["00100", "01100", "00100", "00100", "00100", "00100", "01110"],
@@ -20,39 +40,45 @@ const GLYPHS: Record<string, readonly string[]> = {
 	":": ["00000", "00100", "00100", "00000", "00100", "00100", "00000"],
 };
 
-function parseRatio(url: URL): Ratio | null {
+function parseImageOptions(url: URL): ImageOptions | null {
 	const entries = [...url.searchParams.entries()];
-	if (entries.some(([key]) => key !== "ratio")) {
+	if (entries.some(([key]) => key !== "ratio" && key !== "color")) {
 		return null;
 	}
 
-	const values = url.searchParams.getAll("ratio");
-	if (values.length === 0) {
-		return { width: 16, height: 9 };
-	}
-	if (values.length !== 1) {
+	const ratioValues = url.searchParams.getAll("ratio");
+	const colorValues = url.searchParams.getAll("color");
+	if (ratioValues.length > 1 || colorValues.length > 1) {
 		return null;
 	}
 
-	const match = /^([1-9]\d{0,3}|10000):([1-9]\d{0,3}|10000)$/.exec(values[0]);
-	if (!match) {
+	const colorName = colorValues[0] ?? "black";
+	if (!(colorName in COLORS)) {
 		return null;
 	}
 
-	const width = Number(match[1]);
-	const height = Number(match[2]);
+	let ratio = { width: 16, height: 9 };
+	if (ratioValues.length === 1) {
+		const match = /^([1-9]\d{0,3}|10000):([1-9]\d{0,3}|10000)$/.exec(ratioValues[0]);
+		if (!match) {
+			return null;
+		}
+
+		ratio = { width: Number(match[1]), height: Number(match[2]) };
+	}
+
 	if (
-		width < 1 ||
-		height < 1 ||
-		width > MAX_RATIO_TERM ||
-		height > MAX_RATIO_TERM ||
-		width / height < 1 / 4 ||
-		width / height > 4
+		ratio.width < 1 ||
+		ratio.height < 1 ||
+		ratio.width > MAX_RATIO_TERM ||
+		ratio.height > MAX_RATIO_TERM ||
+		ratio.width / ratio.height < 1 / 4 ||
+		ratio.width / ratio.height > 4
 	) {
 		return null;
 	}
 
-	return { width, height };
+	return { ratio, color: COLORS[colorName] };
 }
 
 function setPixel(
@@ -89,14 +115,14 @@ function fillRect(
 	}
 }
 
-function drawDots(pixels: Uint8Array, width: number, height: number): void {
+function drawDots(pixels: Uint8Array, width: number, height: number, color: Color): void {
 	const radius = 6;
 	for (let centerY = 20; centerY < height; centerY += 40) {
 		for (let centerX = 20; centerX < width; centerX += 40) {
 			for (let y = -radius; y <= radius; y++) {
 				for (let x = -radius; x <= radius; x++) {
 					if (x * x + y * y <= radius * radius) {
-						setPixel(pixels, width, centerX + x, centerY + y, 0, 0, 0);
+						setPixel(pixels, width, centerX + x, centerY + y, color.red, color.green, color.blue);
 					}
 				}
 			}
@@ -197,7 +223,7 @@ async function encodePng(width: number, height: number, pixels: Uint8Array): Pro
 	return output;
 }
 
-async function createImage(ratio: Ratio): Promise<Uint8Array> {
+async function createImage({ ratio, color }: ImageOptions): Promise<Uint8Array> {
 	const landscape = ratio.width >= ratio.height;
 	const width = landscape
 		? MAX_LONG_EDGE
@@ -206,12 +232,12 @@ async function createImage(ratio: Ratio): Promise<Uint8Array> {
 		? Math.round((MAX_LONG_EDGE * ratio.height) / ratio.width)
 		: MAX_LONG_EDGE;
 	const pixels = new Uint8Array(width * height * 4).fill(255);
-	drawDots(pixels, width, height);
+	drawDots(pixels, width, height, color);
 
 	const squareSize = Math.round(Math.min(width, height) * 0.6);
 	const squareX = Math.round((width - squareSize) / 2);
 	const squareY = Math.round((height - squareSize) / 2);
-	fillRect(pixels, width, squareX, squareY, squareSize, squareSize, 0, 0, 0);
+	fillRect(pixels, width, squareX, squareY, squareSize, squareSize, color.red, color.green, color.blue);
 	drawLabel(pixels, width, height, `${ratio.width}:${ratio.height}`, squareX, squareY, squareSize);
 
 	return encodePng(width, height, pixels);
@@ -221,7 +247,7 @@ function errorResponse(): Response {
 	return Response.json(
 		{
 			error:
-				"Ratio must be two positive integers separated by ':' with an aspect ratio from 1:4 to 4:1",
+			"Ratio must be two positive integers separated by ':' with an aspect ratio from 1:4 to 4:1, and color must be red, green, blue, orange, or cyan",
 		},
 		{
 			status: 400,
@@ -236,12 +262,12 @@ export default {
 			return new Response("Not Found", { status: 404 });
 		}
 
-		const ratio = parseRatio(url);
-		if (!ratio) {
+		const options = parseImageOptions(url);
+		if (!options) {
 			return errorResponse();
 		}
 
-		return new Response(await createImage(ratio), {
+		return new Response(await createImage(options), {
 			headers: {
 				"Content-Type": "image/png",
 			},
